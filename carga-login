@@ -1,0 +1,249 @@
+stage.align = "TL";
+stage.scaleMode = StageScaleMode.NO_SCALE;
+import air.net.URLMonitor;
+import com.greensock.*;
+import com.greensock.easing.*;
+include "funciones.as";
+stop();
+//
+var raiz:MovieClip = this;
+var pruebas:Boolean = false;
+var path:String = "http://jsonplaceholder.typicode.com/";
+var usuario:Object = {};
+var primer_vez:Boolean = true;
+var dispositivo:String = "android";
+var idioma:String = (flash.system.Capabilities.language!="es")?"en":flash.system.Capabilities.language;
+var conexion:Boolean, ancho_pantalla:int, alto_pantalla:int, mostro_con:Boolean, vertical:Boolean;
+function init_ini():void {
+	if(stage.fullScreenHeight > stage.fullScreenWidth)raiz.scaleX = raiz.scaleY = stage.fullScreenWidth/640;
+	else raiz.scaleX = raiz.scaleY = stage.fullScreenHeight/640;
+	TweenMax.to(msj_mc, 0, {autoAlpha:0});
+	TweenMax.to(login_mc, 0, {autoAlpha:0});
+	login_mc.dev_txt.text = {es:"Desarrollado por Andrés Muñoz T.", en:"Developed by Andres Munoz T."}[idioma];
+	//
+	login_mc.t0.restrict = login_mc.t1.restrict = "A-Za-z0-9";
+	login_mc.titulo_txt.text = {es:"INGRESE A SU CUENTA", en:"SIGN IN INTO YOUR ACCOUNT"}[idioma];
+	login_mc.bot_txt.text = {es:"CONTINUAR", en:"SIGN IN"}[idioma];
+	login_mc.t0.text = {es:"Usuario", en:"User"}[idioma];
+	login_mc.t1.text = {es:"Contraseña", en:"Password"}[idioma];
+	login_mc.c0.stop();
+	login_mc.c1.stop();
+	login_mc.entrar_mc.addEventListener(MouseEvent.CLICK, ingresar);
+	login_mc.t0.addEventListener(FocusEvent.FOCUS_IN, abrio_ingresar);
+	login_mc.t1.addEventListener(FocusEvent.FOCUS_IN, abrio_ingresar);
+	login_mc.t0.addEventListener(FocusEvent.FOCUS_OUT, cerro_ingresar);
+	login_mc.t1.addEventListener(FocusEvent.FOCUS_OUT, cerro_ingresar);
+	//
+	function cargar_todo(evento:Event):void {
+		if(raiz.framesLoaded==raiz.totalFrames && conexion){
+			raiz.removeEventListener(Event.ENTER_FRAME, cargar_todo);
+			//setTimeout(gotoAndStop, 1500, "bienvenida");//(recibio_noti?"home":"bienvenida"));
+		}
+	}
+	function cargando(evento:ProgressEvent):void {
+		var porc:Number = evento.bytesLoaded/evento.bytesTotal;
+	}
+	raiz.addEventListener(Event.ENTER_FRAME, cargar_todo);
+	raiz.loaderInfo.addEventListener(ProgressEvent.PROGRESS, cargando);
+	//
+	var monitor:URLMonitor = new URLMonitor(new URLRequest(path.substr(0, path.indexOf("/", 8))));
+	monitor.addEventListener(StatusEvent.STATUS, status_internet);
+	function status_internet(evento:StatusEvent):void {
+		conexion = monitor.available;
+		if(!conexion && !mostro_con){
+			abrir_mensajes({es:"no tienes conexión a internet", en:"you do not have internet connection"}[idioma]);
+			mostro_con = true;
+			setTimeout(function(){mostro_con = false;}, 10000);
+		}
+		if(conexion && primer_vez){
+			if(raiz.currentFrameLabel == "carga"){
+				TweenMax.to(login_mc, .5, {autoAlpha:1});
+				carga_mc.visible = false;
+			}
+			primer_vez = false;
+		}
+		trace("conexion:", conexion);
+		//
+		if(raiz.inte_monitor)clearInterval(raiz.inte_monitor);
+		if(!conexion){
+			monitor.stop();
+			raiz.inte_monitor = setInterval(monitor.start, 2000);
+		}
+	}
+	monitor.start();
+	//
+	stage.addEventListener(Event.RESIZE, org_esc_carga);
+	org_esc_carga();
+}
+function salir_inicio(evento:MouseEvent):void {
+	var sec:String = MovieClip(evento.currentTarget).name.substr(0,-3);
+	TweenMax.to(login_mc, .5, {autoAlpha:0});
+	setTimeout(gotoAndStop, 600, sec);
+}
+//__________________________
+//		login
+function abrio_ingresar(evento:FocusEvent):void {
+	trace("abrio_ingresar")
+	var txt:TextField = TextField(evento.target);
+	txt.needsSoftKeyboard = true;
+	txt.requestSoftKeyboard();
+	TweenMax.to(login_mc, .5, {y:320, ease:Quad.easeOut});
+	stage.addEventListener(KeyboardEvent.KEY_UP, ingresar_enter);
+	//
+	var num:int = int(txt.name.substr(1));
+	login_mc.c0.gotoAndStop(Math.abs(num-2));
+	login_mc.c1.gotoAndStop(num+1);
+	login_mc.t0.textColor = num?0x9099B7:0xFFFFFF;
+	login_mc.t1.textColor = num?0xFFFFFF:0x9099B7;
+	if(txt==login_mc.t0 && txt.text=={es:"Usuario", en:"User"}[idioma])txt.text = "";
+	else if(txt==login_mc.t1 && txt.text=={es:"Contraseña", en:"Password"}[idioma]){
+		txt.displayAsPassword = true;
+		txt.text = "";
+	}
+}
+function cerro_ingresar(evento:FocusEvent=null):void {
+	if(!evento)stage.focus = null;
+	TweenMax.to(login_mc, .5, {y:alto_pantalla/2, ease:Quad.easeOut});
+	stage.needsSoftKeyboard = false;
+	stage.requestSoftKeyboard();
+	stage.removeEventListener(KeyboardEvent.KEY_UP, ingresar_enter);
+}
+function ingresar_enter(evento:KeyboardEvent):void {
+	if(evento.charCode == 13)ingresar();
+	//trace(evento.charCode, evento.keyCode);
+}
+function ingresar(evento:MouseEvent=null):void {
+	function cargo_ul(evento:Event):void {
+		var datos:Object = JSON.parse(URLLoader(evento.target).data)[0];
+		for (var i:String in datos) {
+			usuario[i] = datos[i];
+			//trace(i, datos[i]);
+		}
+		stage.removeEventListener(Event.RESIZE, org_esc_carga);
+		setTimeout(gotoAndStop, 100, "home");
+	}
+	cerro_ingresar();
+	if(pruebas || (login_mc.t0.text=="usuario" && login_mc.t1.text=="usuario")){
+		carga_mc.visible = true;
+		TweenMax.to(login_mc, .5, {autoAlpha:0});
+		usuario.id = randomizar(1,11);
+		usuario.usuario = login_mc.t0.text;
+		trace("usuario id:", usuario.id);
+		var ul:URLLoader = new URLLoader(new URLRequest(path+"users?id="+usuario.id));
+		ul.addEventListener(Event.COMPLETE, cargo_ul);
+	}else {
+		carga_mc.visible = false;
+		TweenMax.to(login_mc, .5, {autoAlpha:1, y:alto_pantalla/2, ease:Quad.easeOut});
+		abrir_mensajes({es:"el usuario y/o contraseña no corresponden", en:"the user or password does not match"}[idioma]);
+	}
+}
+//_______________________________
+//		mensajes
+function abrir_mensajes(txt:String):void {
+	msj_mc.txt.text = txt;
+	TweenMax.to(msj_mc, .4, {autoAlpha:1});
+	TweenMax.to(msj_mc, .4, {delay:3, autoAlpha:0});
+}
+//_______________________________
+//		paneles verticales
+var peli_arrastre:MovieClip;
+function config_arrastre(clip:MovieClip, mascara:MovieClip, ocultar:Boolean=false):void {
+	clip.mask = mascara;
+	clip.ocultar = ocultar;
+	clip.pos = [0, 0];
+	clip.posy = clip.y = clip.mask.y;
+	if(clip.height < mascara.height)clip.removeEventListener(MouseEvent.MOUSE_DOWN, presionar_peli);
+	else clip.addEventListener(MouseEvent.MOUSE_DOWN, presionar_peli);
+}
+//		arrastre
+function presionar_peli(evento:MouseEvent):void {
+	var c:MovieClip = MovieClip(evento.currentTarget);
+	var m:MovieClip = MovieClip(c.mask);
+	c.posy = c.y;
+	c.num_arrastre = -1;
+	if(c.height > m.height){
+		peli_arrastre = c;
+		c.startDrag(false, new Rectangle(c.x, m.y, 0, int(m.height-c.height)));
+		c.removeEventListener(Event.ENTER_FRAME, frenado_peli);
+		c.addEventListener(Event.ENTER_FRAME, pos_peli);
+		stage.addEventListener(MouseEvent.MOUSE_UP, soltar_peli);
+		c.y += int(c.vel);
+	}
+}
+function pos_peli(evento:Event):void {
+	var c:MovieClip = MovieClip(evento.currentTarget);
+	c.pos[1] = c.pos[0];
+	c.pos[0] = c.y;
+	if(++c.num_arrastre%5==0 && c.ocultar)verif_peli(c);
+}
+function soltar_peli(evento:MouseEvent):void {
+	var c:MovieClip = peli_arrastre;
+	c.stopDrag();
+	c.vel = int(c.pos[1]-c.pos[0]);
+	//if(Math.abs(c.vel) > 25)c.vel = 25*(Math.abs(c.vel)/c.vel);
+	if(c.vel)c.addEventListener(Event.ENTER_FRAME, frenado_peli);
+	else if(c.ocultar)verif_peli(c);
+}
+function frenado_peli(evento:Event):void {
+	var c:MovieClip = MovieClip(evento.currentTarget);
+	var m:MovieClip = MovieClip(c.mask);
+	c.y -= c.vel;
+	c.vel -= c.vel/Math.abs(c.vel);
+	c.vel = int(c.vel);
+	if(!c.vel || c.y>m.y || c.y+c.height<m.y+m.height){
+		c.vel = 0;
+		if(c.y > m.y)c.y = m.y;
+		else if(c.y+c.height < m.y+m.height)c.y = m.y+m.height-c.height;
+		c.removeEventListener(Event.ENTER_FRAME, frenado_peli);
+		if(c.ocultar)verif_peli(c);
+	}
+	c.y = int(c.y);
+	if(++c.num_arrastre%5==0 && c.ocultar)verif_peli(c);
+}
+function verif_peli(c:MovieClip):void {
+	if(c){
+		for (var i:int=0; i<c.numChildren; i++){
+			if(c.getChildAt(i) as MovieClip){
+				var m:MovieClip = MovieClip(c.getChildAt(i));
+				m.visible = !(c.y+m.y>c.mask.y+c.mask.height*2 || c.y+m.y+m.height<c.mask.y-c.mask.height);
+			}
+		}
+	}
+}
+//__________________________________
+//		genericos
+function cargar_img(dir:String, extra:Function=null):Loader {
+	var ldr:Loader = new Loader();
+	ldr.contentLoaderInfo.addEventListener(Event.COMPLETE, cargo_img);
+	ldr.load(new URLRequest(dir));
+	function cargo_img(evento:Event):void {
+		var img:Bitmap = Bitmap(evento.target.content);
+		img.smoothing = true;
+		if(Boolean(extra))extra();
+	}	
+	return ldr;
+}
+function ir_url(evento:MouseEvent):void {
+	var b:MovieClip = MovieClip(evento.currentTarget);
+	navigateToURL(new URLRequest(b.dir));
+}
+function org_esc_carga(evento:Event=null):void {
+	establecer_medidas();
+	carga_mc.x = login_mc.x = ancho_pantalla/2;
+	carga_mc.y = login_mc.y = alto_pantalla/2;
+}
+function establecer_medidas():void {
+	if(stage.fullScreenHeight > stage.fullScreenWidth){
+		alto_pantalla = int(stage.fullScreenHeight*stage.stageWidth/stage.fullScreenWidth)/raiz.scaleX;
+		ancho_pantalla = 640;
+	}else {
+		alto_pantalla = 640;
+		ancho_pantalla = int(stage.fullScreenWidth*stage.stageHeight/stage.fullScreenHeight)/raiz.scaleY;
+	}
+	msj_mc.x = ancho_pantalla/2;
+	msj_mc.y = alto_pantalla/2;
+	vertical = (ancho_pantalla<alto_pantalla);
+	//trace("establecer_medidas", ancho_pantalla, alto_pantalla);
+}
+//
+init_ini();
