@@ -1,0 +1,487 @@
+import flash.events.MouseEvent;
+import flash.display.MovieClip;
+import flash.events.TransformGestureEvent;
+
+var sec_act:String = "";
+function init_home():void {
+	barra_sup.y = -barra_sup.height;
+	TweenMax.to(barra_sup, .5, {delay:.5, y:0, ease:Quad.easeOut});
+	//
+	home_mc.nombre_txt.text = usuario.name.toUpperCase();
+	home_mc.usuario_txt.text = usuario.username;
+	home_mc.desc_txt.text = usuario.email+"\n"+usuario.phone+"\n"+usuario.company.name;
+	//
+	Multitouch.inputMode = MultitouchInputMode.GESTURE;
+	raiz.addEventListener(TransformGestureEvent.GESTURE_SWIPE, hacer_swipe);
+	NativeApplication.nativeApplication.addEventListener(KeyboardEvent.KEY_DOWN, regresar);
+	stage.addEventListener(Event.RESIZE, org_esc_home);
+	barra_sup.regresar_mc.addEventListener(MouseEvent.CLICK, regresar_sec);
+	org_esc_home();
+	//
+	org_menu();
+	cargar_albums();
+	cargar_listap();
+}
+function regresar_sec(evento:MouseEvent):void {
+	if(sec_act == "galeria")cerrar_img();
+	else if(sec_act == "posts")cerrar_post();
+}
+//__________________________________
+//		posts
+function cargar_listap():void {
+	function cargo_ul(evento:Event):void {
+		var datos:Array = JSON.parse(URLLoader(evento.target).data) as Array;
+		var bp:MovieClip = MovieClip(menu_mc.bots_mc.getChildAt(1));
+		bp.ovalo_mc.visible = true;
+		bp.num_txt.text = datos.length.toString();
+		for (var i:int=0; i<datos.length; i++) {
+			var b:MovieClip = new bot_post();
+			b.y = 72*i;
+			b.datos = datos[i];
+			b.txt.autoSize = TextFieldAutoSize.LEFT;
+			b.txt.text = b.datos.title;
+			b.stop();
+			b.addEventListener(MouseEvent.CLICK, abrir_post);
+			/*if(!i && !vertical){
+				post_mc.mover = false;
+				setTimeout(b.dispatchEvent, 50, new MouseEvent(MouseEvent.CLICK));
+			}*/
+			listap_mc.mc.addChild(b);
+		}
+		config_arrastre(listap_mc.mc, listap_mc.mask_mc);
+	}
+	var ul:URLLoader = new URLLoader(new URLRequest(path+"posts?userId="+usuario.id));
+	ul.addEventListener(Event.COMPLETE, cargo_ul);
+	//
+	post_mc.mc.num_mc.visible = false;
+	post_mc.mc.num_mc.txt.text = {es:"Comentarios", en:"Comments"}[idioma];
+	config_arrastre(post_mc.mc, post_mc.mask_mc);
+	post_mc.mc.titulo_txt.autoSize = post_mc.mc.desc_txt.autoSize = TextFieldAutoSize.LEFT;
+	TweenMax.to(barra_sup.regresar_mc, 0, {autoAlpha:0});
+}
+function abrir_listap(datos:Object):void {
+	mostrar_listap();
+}
+function cerrar_listap():void {
+	TweenMax.to(post_mc, .5, {delay:1, x:ancho_pantalla, ease:Quad.easeIn});
+	if(vertical && post_mc.mostrando){
+		listap_mc.x = ancho_pantalla;
+		post_mc.mostrando = false;
+		TweenMax.to(barra_sup.regresar_mc, .5, {autoAlpha:0});
+	}else TweenMax.to(listap_mc, .5, {delay:1.3, x:ancho_pantalla, ease:Quad.easeIn});
+}
+function mostrar_listap(acomodado:Boolean=false, ordenar:Boolean=true):void {
+	listap_mc.mask_mc.graphics.clear();
+	listap_mc.fondo_mc.graphics.clear();
+	post_mc.fondo_mc.graphics.clear();
+	post_mc.mask_mc.graphics.clear();
+	listap_mc.fondo_mc.graphics.beginFill(0x394264);
+	listap_mc.fondo_mc.graphics.drawRoundRect(0, 0, int(vertical?ancho_pantalla-40:(ancho_pantalla-60)/2), int(alto_pantalla-barra_sup.height-40), 8);
+	listap_mc.mask_mc.graphics.copyFrom(listap_mc.fondo_mc.graphics);
+	post_mc.fondo_mc.graphics.copyFrom(listap_mc.fondo_mc.graphics);
+	post_mc.mask_mc.graphics.copyFrom(listap_mc.fondo_mc.graphics);
+	post_mc.mc.num_mc.fondo_mc.width = post_mc.mc.num_mc.col_mc.width = post_mc.mc.fondo_mc.width = post_mc.fondo_mc.width;
+	post_mc.mc.titulo_txt.width = post_mc.mc.desc_txt.width = int(post_mc.fondo_mc.width-post_mc.mc.titulo_txt.x*2);
+	post_mc.mc.desc_txt.y = int(post_mc.mc.titulo_txt.y+post_mc.mc.titulo_txt.height+20);
+	post_mc.mc.num_mc.y = int(post_mc.mc.desc_txt.y+post_mc.mc.desc_txt.height+20);
+	post_mc.mc.coments_mc.y = int(post_mc.mc.num_mc.y+post_mc.mc.num_mc.height);
+	TweenMax.to(barra_sup.regresar_mc, .5, {autoAlpha:int(vertical && post_mc.mostrando)});
+	//
+	for (var i:int=0; i<listap_mc.mc.numChildren; i++) {
+		var b:MovieClip = MovieClip(listap_mc.mc.getChildAt(i));
+		b.txt.width = int(listap_mc.fondo_mc.width-b.txt.x*1.5);
+		b.txt.y = int((70-b.txt.height)/2);
+	}
+	if(ordenar)config_arrastre(listap_mc.mc, listap_mc.mask_mc);
+	//
+	var alto:int = 0;
+	for (i=0; i<post_mc.mc.coments_mc.numChildren; i++) {
+		b = MovieClip(post_mc.mc.coments_mc.getChildAt(i));
+		b.y = alto;
+		b.nombre_txt.width = b.txt.width = b.email_txt.width = post_mc.mc.titulo_txt.width;
+		b.txt.y = int(b.nombre_txt.y+b.nombre_txt.height+5);
+		b.email_txt.y = int(b.txt.y+b.txt.height+5);
+		b.barra_mc.width = post_mc.fondo_mc.width;
+		alto += b.email_txt.y+35;
+	}
+	post_mc.mc.fondo_mc.height = post_mc.mc.coments_mc.y+alto;
+	config_arrastre(post_mc.mc, post_mc.mask_mc);
+	//
+	listap_mc.y = post_mc.y = barra_sup.height+20;
+	if(acomodado){
+		if(vertical){
+			if(post_mc.mostrando){
+				listap_mc.x = -listap_mc.fondo_mc.width;
+				post_mc.x = 20;
+			}else {
+				listap_mc.x = 20;
+				post_mc.x = ancho_pantalla;
+			}
+		}else {
+			listap_mc.x = 20;
+			post_mc.x = listap_mc.x+listap_mc.fondo_mc.width+20;
+		}
+	}else {
+		if(vertical)listap_mc.x = post_mc.x = ancho_pantalla;
+		else {
+			listap_mc.x = post_mc.x = ancho_pantalla;
+			TweenMax.to(post_mc, .7, {delay:.7, x:listap_mc.fondo_mc.width+40, ease:Quad.easeOut});
+		}
+		TweenMax.to(listap_mc, .7, {x:20, ease:Quad.easeOut});
+	}
+}
+//
+function abrir_post(evento:MouseEvent):void {
+	if(Math.abs(listap_mc.mc.y-listap_mc.mc.posy) < 5){
+		var b:MovieClip = MovieClip(evento.currentTarget);
+		post_mc.mostrando = true;
+		TweenMax.to(barra_sup.regresar_mc, .5, {autoAlpha:int(vertical && post_mc.mover)});
+		for (var i:int=0; i<listap_mc.mc.numChildren; i++){
+			var b2:MovieClip = MovieClip(listap_mc.mc.getChildAt(i));
+			b2.ava = (b==b2);
+			b2.addEventListener(Event.ENTER_FRAME, avanzar);
+		}
+		post_mc.mc.fondo_mc.height = int(post_mc.mc.titulo_txt.y);
+		post_mc.mc.titulo_txt.text = b.datos.title.toUpperCase();
+		post_mc.mc.desc_txt.text = b.datos.body;
+		post_mc.mc.desc_txt.y = int(post_mc.mc.titulo_txt.y+post_mc.mc.titulo_txt.height+20);
+		borrar_todo(post_mc.mc.coments_mc);
+		post_mc.mc.num_mc.visible = false;
+		//
+		var ul:URLLoader = new URLLoader(new URLRequest(path+"comments?postId="+b.datos.id));
+		ul.addEventListener(Event.COMPLETE, cargo_ul);
+		//
+		if(vertical /*&& post_mc.mover*/){
+			TweenMax.to(listap_mc, .7, {x:-listap_mc.fondo_mc.width, ease:Quad.easeOut});
+			TweenMax.to(post_mc, .7, {x:20, ease:Quad.easeOut});
+		}
+		post_mc.mover = true;
+	}
+	function cargo_ul(evento:Event):void {
+		var datos:Array = JSON.parse(URLLoader(evento.target).data) as Array;
+		post_mc.mc.num_mc.num_txt.text = datos.length.toString();
+		post_mc.mc.num_mc.visible = true;
+		for (var i:int=0; i<datos.length; i++) {
+			var b:MovieClip = new bot_comentario();
+			b.y = int(post_mc.mc.coments_mc.height);
+			b.datos = datos[i];
+			b.nombre_txt.autoSize = b.txt.autoSize = TextFieldAutoSize.LEFT;
+			//b.email_txt.autoSize = TextFieldAutoSize.RIGHT;
+			b.nombre_txt.text = b.datos.name;
+			b.txt.text = b.datos.body;
+			b.email_txt.text = b.datos.email;
+			post_mc.mc.coments_mc.addChild(b);
+		}
+		mostrar_listap(true, false);
+	}
+}
+function cerrar_post():void {
+	post_mc.mostrando = false;
+	TweenMax.to(barra_sup.regresar_mc, .5, {autoAlpha:0});
+	//
+	if(vertical){
+		TweenMax.to(listap_mc, .7, {x:20, ease:Quad.easeOut});
+		TweenMax.to(post_mc, .7, {x:ancho_pantalla, ease:Quad.easeOut});
+	}
+}
+//__________________________________
+//		galería
+function cargar_albums():void {
+	function cargo_ul(evento:Event):void {
+		var datos:Array = JSON.parse(URLLoader(evento.target).data) as Array;
+		var bp:MovieClip = MovieClip(menu_mc.bots_mc.getChildAt(2));
+		bp.ovalo_mc.visible = true;
+		bp.num_txt.text = datos.length.toString();
+		for (var i:int=0; i<datos.length; i++) {
+			var b:MovieClip = new bot_sec();
+			b.y = int(menu_mc.bots_mc.height);
+			b.datos = datos[i];
+			b.txt.text = b.datos.title;
+			for (var j:String in bp.datos){
+				b.datos[j] = bp.datos[j];
+			}
+			b.stop();
+			b.addEventListener(MouseEvent.CLICK, sel_bot);
+			menu_mc.bots_mc.addChild(b);
+		}
+		config_arrastre(menu_mc.bots_mc, menu_mc.mask_mc);
+		//
+	}
+	var ul:URLLoader = new URLLoader(new URLRequest(path+"albums?userId="+usuario.id));
+	ul.addEventListener(Event.COMPLETE, cargo_ul);
+	//
+	ampliacion_mc.addChild(ampcuad_mc);
+	ampliacion_mc.addChild(ampliacion_txt);
+	ampliacion_txt.autoSize = TextFieldAutoSize.CENTER;
+	TweenMax.to(barra_sup.regresar_mc, 0, {autoAlpha:0});
+	abrio_img();
+}
+function abrir_album(datos:Object):void {
+	function cargo_ul(evento:Event):void {
+		var datos:Array = JSON.parse(URLLoader(evento.target).data) as Array;
+		var cant:int = Math.floor((minias_mc.fondo_mc.width-10)/150);
+		var espacio:int = (minias_mc.fondo_mc.width-150*cant)/(cant+1);
+		var alto:int = 0;
+		for (var i:int=0; i<datos.length; i++) {
+			var b:MovieClip = new MovieClip();
+			b.datos = datos[i];
+			b.x = i%cant*(150+espacio)+espacio;
+			b.y = Math.floor(i/cant)*(150+espacio)+espacio;
+			alto = b.y+150+espacio;
+			b.addChild(cargar_img(b.datos.thumbnailUrl));
+			b.addEventListener(MouseEvent.CLICK, abrir_img);
+			if(!i){
+				ampliacion_mc.mover = false;
+				setTimeout(b.dispatchEvent, 50, new MouseEvent(MouseEvent.CLICK));
+			}
+			minias_mc.mc.addChild(b);
+		}
+		minias_mc.mc.graphics.beginFill(0x394264);
+		minias_mc.mc.graphics.drawRect(0, 0, (150+espacio)*cant+espacio, alto);
+		config_arrastre(minias_mc.mc, minias_mc.mask_mc);
+	}
+	borrar_todo(minias_mc.mc);
+	mostrar_album(false);
+	var ul:URLLoader = new URLLoader(new URLRequest(path+"photos?albumId="+datos.id));
+	ul.addEventListener(Event.COMPLETE, cargo_ul);
+	trace("album id:", datos.id);
+}
+function cerrar_album():void {
+	TweenMax.to(ampliacion_mc, .5, {delay:1, x:ancho_pantalla, ease:Quad.easeIn});
+	if(vertical && ampliacion_mc.mostrando){
+		minias_mc.x = ancho_pantalla;
+		ampliacion_mc.mostrando = false;
+		TweenMax.to(barra_sup.regresar_mc, .5, {autoAlpha:0});
+	}else TweenMax.to(minias_mc, .5, {delay:1.3, x:ancho_pantalla, ease:Quad.easeIn});
+}
+function mostrar_album(acomodado:Boolean=false):void {
+	minias_mc.mask_mc.graphics.clear();
+	minias_mc.fondo_mc.graphics.clear();
+	ampliacion_mc.fondo_mc.graphics.clear();
+	ampliacion_mc.mask_mc.graphics.clear();
+	minias_mc.fondo_mc.graphics.beginFill(0x394264);
+	minias_mc.fondo_mc.graphics.drawRoundRect(0, 0, int(vertical?ancho_pantalla-40:(ancho_pantalla-60)/2), int(alto_pantalla-barra_sup.height-40), 8);
+	minias_mc.mask_mc.graphics.copyFrom(minias_mc.fondo_mc.graphics);
+	ampliacion_mc.fondo_mc.graphics.copyFrom(minias_mc.fondo_mc.graphics);
+	ampliacion_mc.mask_mc.graphics.copyFrom(minias_mc.fondo_mc.graphics);
+	TweenMax.to(barra_sup.regresar_mc, .5, {autoAlpha:int(vertical && ampliacion_mc.mostrando)});
+	//
+	var cant:int = Math.floor((minias_mc.fondo_mc.width-10)/150);
+	var espacio:int = (minias_mc.fondo_mc.width-150*cant)/(cant+1);
+	var alto:int = 0;
+	for (var i:int=0; i<minias_mc.mc.numChildren; i++) {
+		var b:MovieClip = MovieClip(minias_mc.mc.getChildAt(i));
+		b.posx = i%cant*(150+espacio)+espacio;
+		b.posy = Math.floor(i/cant)*(150+espacio)+espacio;
+		alto = b.posy+150+espacio;
+		TweenMax.to(b, .5, {x:b.posx, y:b.posy, ease:Quad.easeOut});
+	}
+	minias_mc.mc.graphics.clear();
+	minias_mc.mc.graphics.beginFill(0x394264);
+	minias_mc.mc.graphics.drawRect(0, 0, (150+espacio)*cant+espacio, alto);
+	setTimeout(config_arrastre, 600, minias_mc.mc, minias_mc.mask_mc);
+	//
+	abrio_img();
+	minias_mc.y = ampliacion_mc.y = barra_sup.height+20;
+	if(acomodado){
+		if(vertical){
+			if(ampliacion_mc.mostrando){
+				minias_mc.x = -minias_mc.fondo_mc.width;
+				ampliacion_mc.x = 20;
+			}else {
+				minias_mc.x = 20;
+				ampliacion_mc.x = ancho_pantalla;
+			}
+		}else {
+			minias_mc.x = 20;
+			ampliacion_mc.x = minias_mc.x+minias_mc.fondo_mc.width+20;
+		}
+	}else {
+		if(vertical)minias_mc.x = ampliacion_mc.x = ancho_pantalla;
+		else {
+			minias_mc.x = ampliacion_mc.x = ancho_pantalla;
+			TweenMax.to(ampliacion_mc, .7, {delay:.7, x:minias_mc.fondo_mc.width+40, ease:Quad.easeOut});
+		}
+		TweenMax.to(minias_mc, .7, {x:20, ease:Quad.easeOut});
+	}
+}
+//
+function abrir_img(evento:MouseEvent):void {
+	if(Math.abs(minias_mc.mc.y-minias_mc.mc.posy) < 5){
+		var d:Object = MovieClip(evento.currentTarget).datos;
+		ampliacion_mc.mostrando = true;
+		TweenMax.to(barra_sup.regresar_mc, .5, {autoAlpha:int(vertical && ampliacion_mc.mover)});
+		borrar_todo(ampliacion_mc.mc);
+		ampliacion_txt.text = d.title;
+		ampliacion_mc.mc.addChild(cargar_img(d.url, abrio_img));
+		//
+		if(vertical && ampliacion_mc.mover){
+			TweenMax.to(minias_mc, .7, {x:-minias_mc.fondo_mc.width, ease:Quad.easeOut});
+			TweenMax.to(ampliacion_mc, .7, {x:20, ease:Quad.easeOut});
+		}
+		ampliacion_mc.mover = true;
+	}
+}
+function cerrar_img():void {
+	ampliacion_mc.mostrando = false;
+	TweenMax.to(barra_sup.regresar_mc, .5, {autoAlpha:0});
+	//
+	if(vertical){
+		TweenMax.to(minias_mc, .7, {x:20, ease:Quad.easeOut});
+		TweenMax.to(ampliacion_mc, .7, {x:ancho_pantalla, ease:Quad.easeOut});
+	}
+}
+function abrio_img():void {
+	ampcuad_mc.width = ampliacion_mc.fondo_mc.width;
+	if(ampliacion_mc.mc.width)ampliacion_mc.mc.width = ampliacion_mc.mc.height = ampliacion_mc.fondo_mc.width;
+	ampliacion_txt.width = ampliacion_mc.fondo_mc.width-20;
+	ampliacion_txt.y = int((ampliacion_mc.mc.height+10+ampliacion_txt.height > ampliacion_mc.fondo_mc.height)?ampliacion_mc.fondo_mc.height-ampliacion_txt.height-5:ampliacion_mc.mc.height+10);
+	ampcuad_mc.y = ampliacion_txt.y-5;
+	ampcuad_mc.height = int(ampliacion_txt.height+10);
+}
+//__________________________________
+//		home
+function abrir_home(datos:Object):void {
+	mostrar_home();
+}
+function mostrar_home(acomodado:Boolean=false):void {
+	home_mc.fondo_mc.graphics.clear();
+	mapa_mc.fondo_mc.graphics.clear();
+	mapa_mc.mask_mc.graphics.clear();
+	home_mc.fondo_mc.graphics.beginFill(0x394264);
+	home_mc.fondo_mc.graphics.drawRoundRect(0, 0, int(vertical?ancho_pantalla-40:(ancho_pantalla-60)/2), int(vertical?(alto_pantalla-barra_sup.height-60)/2:alto_pantalla-barra_sup.height-40), 8);
+	mapa_mc.fondo_mc.graphics.copyFrom(home_mc.fondo_mc.graphics);
+	mapa_mc.mask_mc.graphics.copyFrom(home_mc.fondo_mc.graphics);
+	//
+	borrar_todo(mapa_mc.mc);
+	home_mc.nombre_txt.width = home_mc.usuario_txt.width = home_mc.desc_txt.width = home_mc.fondo_mc.width;
+	home_mc.nombre_txt.y = int((home_mc.fondo_mc.height-146)/2);
+	home_mc.usuario_txt.y = home_mc.nombre_txt.y+32;
+	home_mc.desc_txt.y = home_mc.nombre_txt.y+70;
+	mapa_mc.mc.addChild(cargar_img("https://maps.googleapis.com/maps/api/staticmap?center="+usuario.address.geo.lat+","+usuario.address.geo.lon+"&size="+mapa_mc.fondo_mc.width+"x"+mapa_mc.fondo_mc.height+"&zoom=14&format=JPEG&markers="+usuario.address.geo.lat+","+usuario.address.geo.lon));
+	//
+	home_mc.y = barra_sup.height+20;
+	if(acomodado){
+		home_mc.x = 20;
+		if(vertical){
+			mapa_mc.x = home_mc.x;
+			mapa_mc.y = home_mc.y+home_mc.height+20;
+		}else {
+			mapa_mc.y = home_mc.y;
+			mapa_mc.x = home_mc.x+home_mc.width+20;
+		}
+	}else {
+		if(vertical){
+			home_mc.x = mapa_mc.x = ancho_pantalla;
+			mapa_mc.y = home_mc.y+home_mc.height+20;
+			TweenMax.to(mapa_mc, 1, {delay:.5, x:20, ease:Quad.easeOut});
+		}else {
+			home_mc.x = mapa_mc.x = ancho_pantalla;
+			mapa_mc.y = home_mc.y;
+			TweenMax.to(mapa_mc, .7, {delay:.7, x:home_mc.width+40, ease:Quad.easeOut});
+		}
+		TweenMax.to(home_mc, 1, {x:20, ease:Quad.easeOut});
+	}
+}
+function cerrar_home():void {
+	TweenMax.to(mapa_mc, .5, {delay:1, x:ancho_pantalla, ease:Quad.easeIn});
+	TweenMax.to(home_mc, .5, {delay:1.3, x:ancho_pantalla, ease:Quad.easeIn});
+}
+//__________________________________
+//		menú
+function org_menu():void {
+	var bots:Array = [{es:"Perfil de Usuario", en:"User Profile", func:abrir_home, col_ppal:0x3468AF, col_sec:0x1A4E95, sec:"home"}, 
+		{es:"Publicaciones", en:"Posts", func:abrir_listap, col_ppal:0xE64C65, col_sec:0xCC324B, sec:"posts"}, 
+		{es:"Galería de Imagenes", en:"Image Gallery", func:abrir_album, col_ppal:0xFCB150, col_sec:0xF38E3C, sec:"galeria"}];
+	for (var i:int=0; i<bots.length; i++){
+		var b:MovieClip = new bot_ppal();
+		var cl:Class = getDefinitionByName("ic"+i) as Class;
+		b.y = int(menu_mc.bots_mc.height);
+		b.datos = bots[i];
+		b.num_txt.text = "";
+		b.ovalo_mc.visible = false;
+		b.txt.text = b.datos.nombre = b.datos[idioma].toUpperCase();
+		b.stop();
+		TweenMax.to(b.col_mc, 0, {colorTransform:{tint:b.datos.col_ppal, tintAmount:1}});
+		if(i < 2)b.addEventListener(MouseEvent.CLICK, sel_bot);
+		if(!i)setTimeout(b.dispatchEvent, 50, new MouseEvent(MouseEvent.CLICK));
+		b.ic_mc.addChild(new cl());
+		menu_mc.bots_mc.addChild(b);
+	}
+	config_arrastre(menu_mc.bots_mc, menu_mc.mask_mc);
+	//
+	menu_mc.txt.text = {es:"MENÚ", en:"MENU"}[idioma];
+	menu_mc.cerrar_mc.width = 0;
+	barra_sup.menu_mc.addEventListener(MouseEvent.CLICK, abrir_menu);
+	menu_mc.cerrar_mc.addEventListener(MouseEvent.CLICK, cerrar_menu);
+}
+function abrir_menu(evento:MouseEvent=null):void {
+	menu_mc.cerrar_mc.width = ancho_pantalla-540;
+	TweenMax.to(menu_mc, .5, {x:0, ease:Quad.easeOut});
+}
+function cerrar_menu(evento:MouseEvent=null):void {
+	menu_mc.cerrar_mc.width = 0;
+	TweenMax.to(menu_mc, .5, {x:-540, ease:Quad.easeIn});
+}
+function sel_bot(evento:MouseEvent):void {
+	var b:MovieClip = MovieClip(evento.currentTarget);
+	if(Math.abs(menu_mc.bots_mc.y-menu_mc.bots_mc.posy)<5 && (sec_act!=b.datos.sec || sec_act=="galeria")){
+		for (var i:int=0; i<menu_mc.bots_mc.numChildren; i++){
+			var b2:MovieClip = MovieClip(menu_mc.bots_mc.getChildAt(i));
+			b2.ava = (b==b2);
+			b2.addEventListener(Event.ENTER_FRAME, avanzar);
+		}
+		barra_sup.txt.text = b.datos.nombre;
+		TweenMax.to(barra_sup.cuad_mc, .5, {colorTransform:{tint:b.datos.col_ppal, tintAmount:1}});
+		TweenMax.to(menu_mc.cuad_mc, .5, {colorTransform:{tint:b.datos.col_sec, tintAmount:1}});
+		setTimeout(cerrar_menu, 700);
+		//
+		cerrar_todo();
+		if(b.datos.func)setTimeout(b.datos.func, 2000, b.datos);
+		sec_act = b.datos.sec
+	}
+}
+//__________________________________
+//		genericos
+function org_esc_home(evento:Event=null):void {
+	establecer_medidas();
+	barra_sup.regresar_mc.x = barra_sup.cuad_mc.width = ancho_pantalla;
+	barra_sup.txt.width = int(ancho_pantalla-barra_sup.txt.x*2);
+	menu_mc.cerrar_mc.height = alto_pantalla;
+	menu_mc.mask_mc.height = int(alto_pantalla-menu_mc.mask_mc.y);
+	menu_mc.fondo_mc.height = int(alto_pantalla-menu_mc.fondo_mc.y);
+	config_arrastre(menu_mc.bots_mc, menu_mc.mask_mc);
+	//
+	if(sec_act == "home")mostrar_home(true);
+	else home_mc.x = mapa_mc.x = ancho_pantalla;
+	//
+	if(sec_act == "galeria")mostrar_album(true);
+	else minias_mc.x = ampliacion_mc.x = ancho_pantalla;
+	//
+	if(sec_act == "posts")mostrar_listap(true);
+	else listap_mc.x = post_mc.x = ancho_pantalla;
+}
+function cerrar_todo():void {
+	if(sec_act == "home")cerrar_home();
+	else if(sec_act=="galeria")cerrar_album();
+	else if(sec_act=="posts")cerrar_listap();	
+	//
+	TweenMax.to(barra_sup.regresar_mc, .5, {autoAlpha:0});
+}
+function regresar(evento:KeyboardEvent):void {
+    if (evento.keyCode == Keyboard.BACK){
+		evento.preventDefault();
+		if(menu_mc.x > -10)cerrar_menu();
+		else if(sec_act=="galeria" && ampliacion_mc.mostrando && vertical)cerrar_img();
+		else if(sec_act=="posts" && post_mc.mostrando && vertical)cerrar_post();
+		else abrir_menu();
+    }
+}
+function hacer_swipe(evento:TransformGestureEvent):void {
+	if(menu_mc.x>-10 && evento.offsetX<0)cerrar_menu();
+	else if(sec_act=="galeria" && ampliacion_mc.mostrando && vertical && evento.offsetX>0)cerrar_img();
+	else if(sec_act=="posts" && post_mc.mostrando && vertical && evento.offsetX>0)cerrar_post();
+	else if(evento.offsetX > 0)abrir_menu();
+}
+//
+init_home();
